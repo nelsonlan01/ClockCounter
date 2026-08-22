@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>時間計算機 v2</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --neon-cyan:   #00f3ff;
+            --neon-pink:   #ff00ea;
+            --neon-yellow: #fcee0a;
+            --neon-green:  #00ff88;
+            --neon-red:    #ff003c;
+            --neon-orange: #ff9500;
+            --bg-color:    #050505;
+            --panel-bg:    rgba(10, 10, 15, 0.8);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 40px 20px;
+            background-color: var(--bg-color);
+            background-image:
+                linear-gradient(rgba(0,243,255,.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,243,255,.05) 1px, transparent 1px);
+            background-size: 30px 30px;
+            font-family: 'Noto Sans TC', sans-serif;
+            color: #fff;
+        }
+
+        /* ── layout ── */
+        .page-wrapper {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            width: 100%;
+            max-width: 1400px;
+            align-items: flex-start;
+        }
+
+        /* ── scanline overlay shared ── */
+        .panel {
+            padding: 36px 32px;
+            border-radius: 10px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            background: var(--panel-bg);
+        }
+        .panel::before {
+            content: "";
+            display: block;
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(rgba(18,16,16,0) 50%, rgba(0,0,0,.25) 50%),
+                linear-gradient(90deg, rgba(255,0,0,.06), rgba(0,255,0,.02), rgba(0,0,255,.06));
+            background-size: 100% 2px, 3px 100%;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        /* panel colour variants */
+        .panel-cyan   { border:2px solid var(--neon-cyan);   box-shadow:0 0 15px var(--neon-cyan),   inset 0 0 20px rgba(0,243,255,.2); }
+        .panel-green  { border:2px solid var(--neon-green);  box-shadow:0 0 15px var(--neon-green),  inset 0 0 20px rgba(0,255,136,.1); }
+        .panel-orange { border:2px solid var(--neon-orange); box-shadow:0 0 15px var(--neon-orange), inset 0 0 20px rgba(255,149,0,.1); }
+
+        /* ── headings ── */
+        h1,h2,h3 {
+            font-family: 'Orbitron', sans-serif;
+            letter-spacing: 2px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin: 0 0 28px;
+            position: relative;
+            z-index: 3;
+        }
+        h1 { color:var(--neon-pink);   text-shadow:0 0 10px var(--neon-pink),   0 0 20px var(--neon-pink);   font-size:20px; }
+        h2 { color:var(--neon-green);  text-shadow:0 0 10px var(--neon-green),  0 0 20px var(--neon-green);  font-size:18px; }
+        h3 { color:var(--neon-orange); text-shadow:0 0 10px var(--neon-orange), 0 0 20px var(--neon-orange); font-size:17px; }
+
+        /* ── live dot ── */
+        .live-indicator {
+            display: none;
+            width:10px; height:10px;
+            background:#ff003c; border-radius:50%;
+            box-shadow:0 0 10px #ff003c,0 0 20px #ff003c;
+            animation:pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%,100%{opacity:1;transform:scale(1);}
+            50%    {opacity:.3;transform:scale(1.2);}
+        }
+
+        /* ── input groups ── */
+        .input-group { margin-bottom:20px; text-align:left; position:relative; z-index:3; }
+        .input-group label {
+            display:flex; justify-content:space-between; margin-bottom:8px;
+            font-family:'Orbitron','Noto Sans TC',sans-serif; font-size:12px;
+        }
+        .panel-cyan   .input-group label { color:var(--neon-cyan);   text-shadow:0 0 5px var(--neon-cyan); }
+        .panel-green  .input-group label { color:var(--neon-green);  text-shadow:0 0 5px var(--neon-green); }
+        .panel-orange .input-group label { color:var(--neon-orange); text-shadow:0 0 5px var(--neon-orange); }
+        .hint { color:#888; font-size:11px; text-shadow:none; }
+
+        /* ── text inputs ── */
+        input[type="datetime-local"],
+        input[type="number"],
+        input[type="text"] {
+            width:100%; padding:11px 12px;
+            background:rgba(0,0,0,.6);
+            font-family:'Orbitron',sans-serif; font-size:13px;
+            border-radius:5px; outline:none; transition:.3s;
+            position:relative; z-index:3;
+        }
+        .panel-cyan   input { border:1px solid var(--neon-cyan);   color:var(--neon-cyan); }
+        .panel-green  input { border:1px solid var(--neon-green);  color:var(--neon-green);}
+        .panel-orange input { border:1px solid var(--neon-orange); color:var(--neon-orange);}
+
+        .panel-cyan   input:focus { box-shadow:0 0 14px var(--neon-cyan);   background:rgba(0,243,255,.08);}
+        .panel-green  input:focus { box-shadow:0 0 14px var(--neon-green);  background:rgba(0,255,136,.06);}
+        .panel-orange input:focus { box-shadow:0 0 14px var(--neon-orange); background:rgba(255,149,0,.06);}
+
+        ::-webkit-calendar-picker-indicator{filter:invert(1) sepia(100%) saturate(10000%) hue-rotate(130deg);cursor:pointer;}
+
+        /* ── buttons ── */
+        .btn {
+            width:100%; padding:13px; background:transparent;
+            font-family:'Orbitron','Noto Sans TC',sans-serif;
+            font-size:14px; font-weight:bold; letter-spacing:1.5px;
+            cursor:pointer; border-radius:5px; transition:all .3s ease;
+            position:relative; z-index:3; margin-top:6px;
+        }
+        .btn-pink   { border:2px solid var(--neon-pink);   color:var(--neon-pink);   text-shadow:0 0 5px var(--neon-pink);   box-shadow:0 0 10px rgba(255,0,234,.3);}
+        .btn-pink:hover   { background:var(--neon-pink);   color:#000; box-shadow:0 0 20px var(--neon-pink),   0 0 40px var(--neon-pink);   text-shadow:none;}
+        .btn-green  { border:2px solid var(--neon-green);  color:var(--neon-green);  text-shadow:0 0 5px var(--neon-green);  box-shadow:0 0 10px rgba(0,255,136,.3);}
+        .btn-green:hover  { background:var(--neon-green);  color:#000; box-shadow:0 0 20px var(--neon-green),  0 0 40px var(--neon-green);  text-shadow:none;}
+        .btn-red    { border:2px solid var(--neon-red);    color:var(--neon-red);    text-shadow:0 0 5px var(--neon-red);    box-shadow:0 0 10px rgba(255,0,60,.3);}
+        .btn-red:hover    { background:var(--neon-red);    color:#fff; box-shadow:0 0 20px var(--neon-red),    0 0 40px var(--neon-red);    text-shadow:none;}
+        .btn-orange { border:2px solid var(--neon-orange); color:var(--neon-orange); text-shadow:0 0 5px var(--neon-orange); box-shadow:0 0 10px rgba(255,149,0,.3);}
+        .btn-orange:hover { background:var(--neon-orange); color:#000; box-shadow:0 0 20px var(--neon-orange), 0 0 40px var(--neon-orange); text-shadow:none;}
+
+        .action-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; position:relative; z-index:3; }
+
+        /* ── unit grid ── */
+        .unit-select-grid {
+            display:grid; grid-template-columns:repeat(4,1fr);
+            gap:7px; margin-bottom:18px; position:relative; z-index:3;
+        }
+        .unit-btn {
+            padding:9px 4px; background:transparent;
+            border:1px solid var(--neon-green); color:var(--neon-green);
+            font-family:'Orbitron','Noto Sans TC',sans-serif; font-size:10px;
+            cursor:pointer; border-radius:5px; transition:all .2s ease;
+            text-shadow:0 0 5px var(--neon-green); letter-spacing:.5px;
+        }
+        .unit-btn:hover,.unit-btn.active {
+            background:var(--neon-green); color:#000;
+            box-shadow:0 0 10px var(--neon-green); text-shadow:none; font-weight:bold;
+        }
+
+        /* ── result panels ── */
+        .result-panel {
+            margin-top:24px; padding:18px; border-radius:5px;
+            min-height:70px; display:flex; flex-direction:column;
+            align-items:center; justify-content:center; position:relative; z-index:3;
+        }
+        .result-panel-cyan   { border:1px dashed var(--neon-cyan);   background:rgba(0,243,255,.04);}
+        .result-panel-green  { border:1px dashed var(--neon-green);  background:rgba(0,255,136,.04);}
+        .result-panel-orange { border:1px dashed var(--neon-orange); background:rgba(255,149,0,.04);}
+
+        .result-text { font-size:16px; line-height:1.8; color:#fff; text-shadow:0 0 8px rgba(255,255,255,.8); margin-bottom:12px; }
+        .highlight   { color:var(--neon-cyan); font-size:22px; font-weight:bold; text-shadow:0 0 10px var(--neon-cyan); font-family:'Orbitron',sans-serif; margin:0 4px; display:inline-block; min-width:28px; }
+        .secondary-result { font-size:13px; color:var(--neon-yellow); text-shadow:0 0 8px rgba(252,238,10,.6); border-top:1px solid rgba(252,238,10,.3); padding-top:12px; width:100%; line-height:1.7; }
+        .secondary-highlight { font-family:'Orbitron',sans-serif; font-weight:bold; font-size:16px; }
+
+        /* ── time-stamp rows (panel 1 new addition) ── */
+        .time-stamps {
+            width:100%; font-size:11px; font-family:'Orbitron',monospace;
+            text-align:left; border-top:1px solid rgba(0,243,255,.25);
+            margin-top:12px; padding-top:10px; line-height:2.1; color:#aaa;
+        }
+        .ts-section { margin-bottom:6px; }
+        .ts-label   { color:var(--neon-cyan); opacity:.8; display:block; font-size:10px; letter-spacing:1px; }
+        .ts-human   { color:#fff; display:block; }
+        .ts-unix    { color:var(--neon-yellow); font-size:10px; display:block; }
+
+        /* ── offset result ── */
+        .offset-result-date { font-family:'Orbitron',sans-serif; font-size:18px; font-weight:bold; line-height:1.7; letter-spacing:1px; }
+        .offset-result-date.add-mode { color:var(--neon-green); text-shadow:0 0 12px var(--neon-green),0 0 25px var(--neon-green); }
+        .offset-result-date.sub-mode { color:var(--neon-red);   text-shadow:0 0 12px var(--neon-red),  0 0 25px var(--neon-red);   }
+        .offset-label     { font-size:11px; color:#888; margin-bottom:8px; font-family:'Orbitron',sans-serif; letter-spacing:1px; }
+        .offset-breakdown { font-size:11px; margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,255,255,.12); color:#aaa; line-height:1.9; font-family:'Orbitron',sans-serif; }
+
+        /* ── panel 3 unix converter ── */
+        .unix-live-display {
+            font-family:'Orbitron',sans-serif; font-size:26px; font-weight:bold;
+            color:var(--neon-orange); text-shadow:0 0 14px var(--neon-orange),0 0 30px var(--neon-orange);
+            letter-spacing:2px; margin:0 0 4px; position:relative; z-index:3;
+        }
+        .unix-live-sub   { font-family:'Orbitron',sans-serif; font-size:10px; color:#888; letter-spacing:1px; margin-bottom:6px; position:relative; z-index:3; }
+        .unix-live-human { font-size:12px; font-family:'Orbitron',sans-serif; color:var(--neon-yellow); text-shadow:0 0 8px rgba(252,238,10,.6); margin-bottom:4px; letter-spacing:.5px; position:relative; z-index:3; }
+        .unix-live-ms    { font-size:10px; font-family:'Orbitron',sans-serif; color:#666; margin-bottom:20px; position:relative; z-index:3; }
+
+        .convert-divider { border:none; border-top:1px solid rgba(255,149,0,.3); margin:20px 0; position:relative; z-index:3; }
+        .convert-section-title { font-family:'Orbitron',sans-serif; font-size:11px; color:var(--neon-orange); text-shadow:0 0 5px var(--neon-orange); text-align:left; margin-bottom:12px; letter-spacing:1.5px; position:relative; z-index:3; }
+
+        .convert-result {
+            font-family:'Orbitron',sans-serif; font-size:13px; color:#fff;
+            text-align:left; line-height:2; position:relative; z-index:3;
+            padding:12px 14px; border-radius:5px;
+            background:rgba(255,149,0,.05); border:1px dashed rgba(255,149,0,.3);
+            margin-top:10px; min-height:52px; word-break:break-all;
+        }
+        .cv-orange { color:var(--neon-orange); text-shadow:0 0 8px var(--neon-orange); }
+        .cv-yellow { color:var(--neon-yellow); text-shadow:0 0 8px rgba(252,238,10,.5); font-size:11px; }
+        .cv-muted  { color:#666; font-size:10px; }
+
+        .error { color:#ff003c; text-shadow:0 0 10px #ff003c; font-weight:bold; letter-spacing:1px; }
+
+        @media(max-width:960px){ .page-wrapper{ grid-template-columns:1fr 1fr; } }
+        @media(max-width:600px){ .page-wrapper{ grid-template-columns:1fr; } }
+    </style>
+</head>
+<body>
+<div class="page-wrapper">
+
+    <!-- ══════════════════════════════════════
+         PANEL 1 — Time Difference Calculator
+    ══════════════════════════════════════ -->
+    <div class="panel panel-cyan">
+        <h1>
+            時間計算機 v2
+            <div id="live-indicator" class="live-indicator" title="即時同步中"></div>
+        </h1>
+
+        <div class="input-group">
+            <label><span>INITIAL_TIME // 起始時間</span><span class="hint">(留空=現在)</span></label>
+            <input type="datetime-local" id="start-time" step="1">
+        </div>
+        <div class="input-group">
+            <label><span>TARGET_TIME // 結束時間</span><span class="hint">(留空=現在)</span></label>
+            <input type="datetime-local" id="end-time" step="1">
+        </div>
+
+        <button class="btn btn-pink" onclick="startCalculation()">EXECUTE // 執行運算</button>
+
+        <div id="result-panel" class="result-panel result-panel-cyan">
+            <div class="result-text" style="margin-bottom:0">等待指令輸入...</div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PANEL 2 — Date Offset Calculator
+    ══════════════════════════════════════ -->
+    <div class="panel panel-green">
+        <h2>日期偏移計算機</h2>
+
+        <div class="input-group">
+            <label><span>BASE_TIME // 基準時間</span><span class="hint">(留空=現在)</span></label>
+            <input type="datetime-local" id="offset-base" step="1">
+        </div>
+        <div class="input-group">
+            <label><span>AMOUNT // 數量</span></label>
+            <input type="number" id="offset-amount" value="1" min="0" step="1" placeholder="輸入數量">
+        </div>
+        <div class="input-group">
+            <label><span>UNIT // 單位</span></label>
+        </div>
+
+        <div class="unit-select-grid">
+            <button class="unit-btn active" data-unit="seconds" onclick="selectUnit(this)">秒<br>SEC</button>
+            <button class="unit-btn" data-unit="minutes" onclick="selectUnit(this)">分<br>MIN</button>
+            <button class="unit-btn" data-unit="hours"   onclick="selectUnit(this)">時<br>HR</button>
+            <button class="unit-btn" data-unit="days"    onclick="selectUnit(this)">日<br>DAY</button>
+            <button class="unit-btn" data-unit="weeks"   onclick="selectUnit(this)">周<br>WK</button>
+            <button class="unit-btn" data-unit="months"  onclick="selectUnit(this)">月<br>MON</button>
+            <button class="unit-btn" data-unit="years"   onclick="selectUnit(this)">年<br>YR</button>
+            <button class="unit-btn" data-unit="decades" onclick="selectUnit(this)">十年<br>DEC</button>
+        </div>
+
+        <div class="action-row">
+            <button class="btn btn-green" onclick="calculateOffset('add')">＋ 加上 ADD</button>
+            <button class="btn btn-red"   onclick="calculateOffset('sub')">－ 減去 SUB</button>
+        </div>
+
+        <div id="offset-result-panel" class="result-panel result-panel-green">
+            <div class="result-text" style="margin-bottom:0">等待指令輸入...</div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PANEL 3 — Unix Timestamp Converter
+    ══════════════════════════════════════ -->
+    <div class="panel panel-orange">
+        <h3>UNIX 時間轉換器</h3>
+
+        <!-- live clock -->
+        <div id="unix-live"       class="unix-live-display">0000000000</div>
+        <div                      class="unix-live-sub">CURRENT UNIX TIMESTAMP (seconds)</div>
+        <div id="unix-live-human" class="unix-live-human">──</div>
+        <div id="unix-live-ms"    class="unix-live-ms">──</div>
+
+        <hr class="convert-divider">
+
+        <!-- A: date → unix -->
+        <div class="convert-section-title">▸ DATE → UNIX</div>
+        <div class="input-group">
+            <label><span>INPUT_TIME // 輸入時間</span><span class="hint">(留空=現在)</span></label>
+            <input type="datetime-local" id="d2u-input" step="1">
+        </div>
+        <button class="btn btn-orange" onclick="convertDateToUnix()">CONVERT // 轉換</button>
+        <div id="d2u-result" class="convert-result">──</div>
+
+        <hr class="convert-divider">
+
+        <!-- B: unix → date -->
+        <div class="convert-section-title">▸ UNIX → DATE</div>
+        <div class="input-group">
+            <label><span>UNIX_TIMESTAMP // 秒或毫秒</span><span class="hint">(自動識別)</span></label>
+            <input type="number" id="u2d-input" placeholder="e.g. 1747382400" step="1">
+        </div>
+        <button class="btn btn-orange" onclick="convertUnixToDate()">CONVERT // 轉換</button>
+        <div id="u2d-result" class="convert-result">──</div>
+    </div>
+
+</div><!-- end .page-wrapper -->
+
+<script>
+/* ── helpers ── */
+const pad = n => n.toString().padStart(2,'0');
+const weekdays = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+
+function humanReadable(d) {
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}  ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}  ${weekdays[d.getDay()]}`;
+}
+function unixSec(d) { return Math.floor(d.getTime()/1000); }
+
+/* ══════════════════════════════════════
+   PANEL 1 — time difference
+══════════════════════════════════════ */
+let timerInterval = null;
+
+function startCalculation() {
+    if (timerInterval) clearInterval(timerInterval);
+    const ok = calculateTimeDifference();
+    if (ok) timerInterval = setInterval(calculateTimeDifference, 1000);
+}
+
+function calculateTimeDifference() {
+    const startInput   = document.getElementById('start-time').value;
+    const endInput     = document.getElementById('end-time').value;
+    const resultDiv    = document.getElementById('result-panel');
+    const liveIndicator= document.getElementById('live-indicator');
+
+    if (!startInput && !endInput) {
+        resultDiv.innerHTML = "<span class='error'>[ERROR] 偵測不到參數，請至少輸入一個時間。</span>";
+        liveIndicator.style.display = 'none';
+        return false;
+    }
+
+    const now       = new Date();
+    const isLive    = !startInput || !endInput;
+    liveIndicator.style.display = isLive ? 'block' : 'none';
+
+    const startDate = startInput ? new Date(startInput) : now;
+    const endDate   = endInput   ? new Date(endInput)   : now;
+
+    let d1 = startDate <= endDate ? startDate : endDate;
+    let d2 = startDate <= endDate ? endDate   : startDate;
+
+    let years=d2.getFullYear()-d1.getFullYear(), months=d2.getMonth()-d1.getMonth(),
+        days=d2.getDate()-d1.getDate(), hours=d2.getHours()-d1.getHours(),
+        minutes=d2.getMinutes()-d1.getMinutes(), seconds=d2.getSeconds()-d1.getSeconds();
+
+    if(seconds<0){seconds+=60;minutes--;} if(minutes<0){minutes+=60;hours--;}
+    if(hours<0)  {hours+=24;days--;}
+    if(days<0)   {days+=new Date(d2.getFullYear(),d2.getMonth(),0).getDate();months--;}
+    if(months<0) {months+=12;years--;}
+
+    const ms=Math.abs(d2-d1), totalCalendarDays=Math.floor(ms/86400000);
+    const totalWeeks=Math.floor(totalCalendarDays/7), remDays=totalCalendarDays%7;
+
+    let dir = startInput && endInput
+        ? (startDate>endDate ? '時間倒流了' : '時間推進了')
+        : (startDate<now||endDate<now ? '距離現在已經過了' : '距離現在還有');
+
+    const labelA = startInput ? '起始時間' : '起始 (現在)';
+    const labelB = endInput   ? '結束時間' : '結束 (現在)';
+
+    resultDiv.innerHTML = `
+        <div class="result-text">
+            ${dir}<br>
+            <span class="highlight">${years}</span> 年
+            <span class="highlight">${pad(months)}</span> 月
+            <span class="highlight">${pad(days)}</span> 日 <br>
+            <span class="highlight">${pad(hours)}</span> 時
+            <span class="highlight">${pad(minutes)}</span> 分
+            <span class="highlight">${pad(seconds)}</span> 秒
+        </div>
+        <div class="secondary-result">
+            TOTAL_DAYS：<span class="secondary-highlight">${totalCalendarDays}</span> 天&emsp;
+            TOTAL_WEEKS：<span class="secondary-highlight">${totalWeeks}</span> 周又 <span class="secondary-highlight">${remDays}</span> 天
+        </div>
+        <div class="time-stamps">
+            <div class="ts-section">
+                <span class="ts-label">▸ ${labelA}</span>
+                <span class="ts-human">${humanReadable(startDate)}</span>
+                <span class="ts-unix">UNIX &nbsp;${unixSec(startDate)} s &nbsp;/&nbsp; ${startDate.getTime()} ms</span>
+            </div>
+            <div class="ts-section">
+                <span class="ts-label">▸ ${labelB}</span>
+                <span class="ts-human">${humanReadable(endDate)}</span>
+                <span class="ts-unix">UNIX &nbsp;${unixSec(endDate)} s &nbsp;/&nbsp; ${endDate.getTime()} ms</span>
+            </div>
+        </div>`;
+
+    return true;
+}
+
+/* ══════════════════════════════════════
+   PANEL 2 — date offset
+══════════════════════════════════════ */
+let selectedUnit = 'seconds';
+
+function selectUnit(btn) {
+    document.querySelectorAll('.unit-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedUnit = btn.dataset.unit;
+}
+
+const UNIT_LABELS={seconds:'秒',minutes:'分',hours:'時',days:'日',weeks:'周',months:'月',years:'年',decades:'十年'};
+
+function calculateOffset(mode) {
+    const baseInput=document.getElementById('offset-base').value;
+    const amount=parseFloat(document.getElementById('offset-amount').value);
+    const panel=document.getElementById('offset-result-panel');
+
+    if(isNaN(amount)||amount<0){panel.innerHTML="<span class='error'>[ERROR] 請輸入有效的數量。</span>";return;}
+
+    const base=baseInput?new Date(baseInput):new Date();
+    const result=new Date(base);
+    const sign=mode==='add'?1:-1;
+
+    switch(selectedUnit){
+        case 'seconds':result.setSeconds(result.getSeconds()+sign*amount);break;
+        case 'minutes':result.setMinutes(result.getMinutes()+sign*amount);break;
+        case 'hours':  result.setHours(result.getHours()+sign*amount);break;
+        case 'days':   result.setDate(result.getDate()+sign*amount);break;
+        case 'weeks':  result.setDate(result.getDate()+sign*amount*7);break;
+        case 'months': result.setMonth(result.getMonth()+sign*amount);break;
+        case 'years':  result.setFullYear(result.getFullYear()+sign*amount);break;
+        case 'decades':result.setFullYear(result.getFullYear()+sign*amount*10);break;
+    }
+
+    const modeLabel=mode==='add'?'＋ 加上':'－ 減去';
+    const modeClass=mode==='add'?'add-mode':'sub-mode';
+    const modeColor=mode==='add'?'var(--neon-green)':'var(--neon-red)';
+    const baseLbl=baseInput
+        ?`${base.getFullYear()}-${pad(base.getMonth()+1)}-${pad(base.getDate())} ${pad(base.getHours())}:${pad(base.getMinutes())}:${pad(base.getSeconds())}`
+        :'現在時間';
+
+    panel.innerHTML=`
+        <div class="offset-label">基準：${baseLbl} &nbsp;|&nbsp; <span style="color:${modeColor}">${modeLabel} ${amount} ${UNIT_LABELS[selectedUnit]}</span></div>
+        <div class="offset-result-date ${modeClass}">
+            ${result.getFullYear()} 年 ${pad(result.getMonth()+1)} 月 ${pad(result.getDate())} 日<br>
+            ${weekdays[result.getDay()]}&nbsp;&nbsp;${pad(result.getHours())} : ${pad(result.getMinutes())} : ${pad(result.getSeconds())}
+        </div>
+        <div class="offset-breakdown">
+            ISO &nbsp;&nbsp;${result.toISOString().replace('T',' ').slice(0,19)}<br>
+            UNIX ${unixSec(result)} s &nbsp;/&nbsp; ${result.getTime()} ms
+        </div>`;
+}
+
+/* ══════════════════════════════════════
+   PANEL 3 — Unix live clock + converter
+══════════════════════════════════════ */
+function tickUnixClock(){
+    const now=new Date();
+    document.getElementById('unix-live').textContent=unixSec(now);
+    document.getElementById('unix-live-human').textContent=humanReadable(now);
+    document.getElementById('unix-live-ms').textContent=now.getTime()+' ms';
+}
+tickUnixClock();
+setInterval(tickUnixClock,1000);
+
+function convertDateToUnix(){
+    const inp=document.getElementById('d2u-input').value;
+    const el=document.getElementById('d2u-result');
+    const d=inp?new Date(inp):new Date();
+    if(isNaN(d)){el.innerHTML="<span class='error'>[ERROR] 無效日期</span>";return;}
+    el.innerHTML=`
+        <span class="cv-orange">${unixSec(d)}</span> <span class="cv-muted">秒 (s)</span><br>
+        <span class="cv-yellow">${d.getTime()} ms</span><br>
+        <span class="cv-yellow">${humanReadable(d)}</span><br>
+        <span class="cv-yellow">ISO &nbsp;${d.toISOString().replace('T',' ').slice(0,19)}</span>`;
+}
+
+function convertUnixToDate(){
+    const raw=document.getElementById('u2d-input').value.trim();
+    const el=document.getElementById('u2d-result');
+    if(!raw){el.innerHTML="<span class='error'>[ERROR] 請輸入 Unix 時間戳</span>";return;}
+    const num=parseFloat(raw);
+    if(isNaN(num)){el.innerHTML="<span class='error'>[ERROR] 數值無效</span>";return;}
+    /* auto-detect: >1e12 = milliseconds */
+    const isMs=num>1e12;
+    const ms=isMs?num:num*1000;
+    const d=new Date(ms);
+    if(isNaN(d)){el.innerHTML="<span class='error'>[ERROR] 無法解析時間戳</span>";return;}
+    el.innerHTML=`
+        <span class="cv-orange">${humanReadable(d)}</span><br>
+        <span class="cv-yellow">ISO &nbsp;${d.toISOString().replace('T',' ').slice(0,19)}</span><br>
+        <span class="cv-yellow">UNIX ${unixSec(d)} s &nbsp;/&nbsp; ${d.getTime()} ms</span><br>
+        <span class="cv-muted">輸入識別：${isMs?'毫秒 (ms)':'秒 (s)'}</span>`;
+} 
+</script>
+</body>
+</html>
